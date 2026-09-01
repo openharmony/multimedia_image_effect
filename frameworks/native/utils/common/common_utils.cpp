@@ -16,6 +16,7 @@
 #include "common_utils.h"
 
 #include <charconv>
+#include <system_error>
 
 #include "effect_log.h"
 #include "effect_buffer.h"
@@ -42,6 +43,22 @@ namespace {
     const int32_t YUV_PLANE_COUNT = 2;
     const int32_t YUV_HALF = 2;
     const int32_t P010_BYTES_PIXEL = 2;
+
+    bool ParseExifInt32(const std::string &text, int32_t &out)
+    {
+        if (text.empty()) {
+            return false;
+        }
+        int32_t parsed = 0;
+        const char *first = text.data();
+        const char *last = first + text.size();
+        auto res = std::from_chars(first, last, parsed);
+        if (res.ec != std::errc() || res.ptr != last) {
+            return false;
+        }
+        out = parsed;
+        return true;
+    }
 }
 
 using namespace OHOS::ColorManager;
@@ -567,9 +584,12 @@ int32_t GetImagePropertyInt(const std::shared_ptr<ExifMetadata> &exifMetadata, c
         return ret;
     }
 
-    std::from_chars_result res = std::from_chars(strValue.data(), strValue.data() + strValue.size(), value);
-
-    return res.ec != std::errc() ? static_cast<int32_t>(ErrorCode::ERR_IMAGE_DATA) : 0;
+    int32_t parsed = 0;
+    if (!ParseExifInt32(strValue, parsed)) {
+        return static_cast<int32_t>(ErrorCode::ERR_IMAGE_DATA);
+    }
+    value = parsed;
+    return 0;
 }
 
 void PrintImageExifInfo(const std::shared_ptr<ExifMetadata> &exifMetadata, const std::string &tag)
